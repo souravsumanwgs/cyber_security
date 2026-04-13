@@ -13,16 +13,41 @@ permissions:
 jobs:
   validate-and-provision:
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: ./infrastructure
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.7.0
+
+      # 🔥 ADD THIS (IMPORTANT)
+      - name: Configure Terraform Cloud Token
+        run: |
+          mkdir -p $HOME/.terraform.d
+          cat > $HOME/.terraform.d/credentials.tfrc.json << EOF
+          {
+            "credentials": {
+              "app.terraform.io": {
+                "token": "${{ secrets.TFC_API_TOKEN }}"
+              }
+            }
+          }
+          EOF
+
+      # 🔥 ADD THIS (AWS LOGIN FIX)
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
 
       - name: Terraform Init
         run: terraform init -input=false
@@ -34,7 +59,3 @@ jobs:
       - name: Terraform Apply (Merge)
         if: github.event_name == 'push'
         run: terraform apply -input=false -auto-approve
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
